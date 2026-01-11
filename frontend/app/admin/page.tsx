@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import {
     FiUsers, FiDollarSign, FiTrendingUp, FiSettings,
     FiLogOut, FiSearch, FiCheck, FiX, FiPlus, FiMinus,
-    FiHome, FiShield, FiLock, FiUnlock
+    FiHome, FiShield, FiLock, FiUnlock, FiRefreshCw, FiList,
+    FiCalendar, FiDatabase
 } from 'react-icons/fi';
 import { MdAdminPanelSettings, MdAttachMoney, MdHistory } from 'react-icons/md';
 
@@ -17,6 +18,7 @@ export default function AdminDashboard() {
     const [notification, setNotification] = useState("");
     const [activeTab, setActiveTab] = useState("USERS");
     const API_URL = 'https://1xplane.com';
+
     // Settings State
     const [settings, setSettings] = useState({
         force_crash_point: 0.0,
@@ -30,11 +32,12 @@ export default function AdminDashboard() {
     const [searchQuery, setSearchQuery] = useState("");
     const [topUpAmount, setTopUpAmount] = useState<{ [key: number]: string }>({});
 
-    // New Profit State
+    // Profit State
     const [profitStats, setProfitStats] = useState({
-        total_bets: 0.0,
+        current_profit: 0.0,
         total_profit: 0.0,
-        recent_rounds: []
+        current_bets: 0.0,
+        history: []
     });
 
     useEffect(() => {
@@ -81,15 +84,25 @@ export default function AdminDashboard() {
         } catch (error) { console.error("Profit fetch failed"); }
     };
 
-    const handleSaveSettings = async () => {
+    const handleClearProfit = async () => {
+        if (!confirm("Are you sure you want to CLEAR current profit? This will move the current amount to history and reset the counter to 0.")) return;
+        
         try {
-            await axios.post(`${API_URL}/api/admin/settings/`, settings, {
+            await axios.post(`${API_URL}/api/admin/profit/clear/`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            showNotify("✅ Settings Updated Successfully!");
+            showNotify("✅ Profit Cleared & Saved to History!");
+            loadProfit(token!);
         } catch (error) {
-            showNotify("❌ Failed to save settings!");
+            showNotify("❌ Failed to clear profit");
         }
+    };
+
+    const handleSaveSettings = async () => {
+        try {
+            await axios.post(`${API_URL}/api/admin/settings/`, settings, { headers: { Authorization: `Bearer ${token}` } });
+            showNotify("✅ Settings Updated Successfully!");
+        } catch (error) { showNotify("❌ Failed to save settings!"); }
     };
 
     const handleTransaction = async (userId: number, username: string, type: 'ADD' | 'DEDUCT') => {
@@ -98,9 +111,7 @@ export default function AdminDashboard() {
         const amount = parseFloat(rawAmount);
         if (isNaN(amount) || amount <= 0) { showNotify("❌ Invalid Amount"); return; }
         const finalAmount = type === 'ADD' ? amount : -amount;
-
         if (!confirm(`Confirm ${type} $${amount} for ${username}?`)) return;
-
         try {
             await axios.post(`${API_URL}/api/admin/add-balance/`, { user_id: userId, amount: finalAmount }, { headers: { Authorization: `Bearer ${token}` } });
             showNotify(`✅ Success: ${type} $${amount}`);
@@ -147,24 +158,21 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                     <div className="flex gap-3">
-                        <button
+                        <button 
                             onClick={() => router.push('/')}
                             className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-gray-800 to-gray-900 rounded-xl font-semibold border border-gray-700 hover:from-gray-700 hover:to-gray-800 transition-all active:scale-95"
                         >
-                            <FiHome />
-                            Game View
+                            <FiHome /> Game View
                         </button>
-                        <button
+                        <button 
                             onClick={() => { localStorage.clear(); router.push('/admin-login'); }}
                             className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-red-600 to-red-700 rounded-xl font-semibold border border-red-500/30 hover:from-red-500 hover:to-red-600 transition-all active:scale-95"
                         >
-                            <FiLogOut />
-                            Logout
+                            <FiLogOut /> Logout
                         </button>
                     </div>
                 </div>
 
-                {/* Notification */}
                 {notification && (
                     <div className={`fixed top-5 right-5 px-6 py-3 rounded-xl shadow-2xl z-50 animate-bounce-in ${notification.includes('✅') ? 'bg-gradient-to-r from-emerald-600 to-emerald-700' : 'bg-gradient-to-r from-red-600 to-red-700'}`}>
                         <div className="flex items-center gap-3 text-white font-bold">
@@ -174,84 +182,59 @@ export default function AdminDashboard() {
                     </div>
                 )}
 
-                {/* Stats Cards */}
+                {/* Profit Stats Section */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    {/* Current Bets */}
                     <div className="bg-gradient-to-br from-blue-900/50 to-blue-800/50 backdrop-blur-sm p-6 rounded-2xl border border-blue-800/30 shadow-lg">
                         <div className="flex items-center gap-3 mb-3">
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center">
                                 <FiDollarSign className="text-white" />
                             </div>
                             <div>
-                                <h3 className="text-blue-300 text-xs font-bold uppercase tracking-wider">Total Bets</h3>
-                                <p className="text-2xl font-black text-white">${profitStats.total_bets.toFixed(2)}</p>
+                                <h3 className="text-blue-300 text-xs font-bold uppercase tracking-wider">Current Bets</h3>
+                                <p className="text-2xl font-black text-white">${profitStats.current_bets.toFixed(2)}</p>
                             </div>
                         </div>
                     </div>
 
-                    <div className={`bg-gradient-to-br ${profitStats.total_profit >= 0 ? 'from-emerald-900/50 to-emerald-800/50 border-emerald-800/30' : 'from-red-900/50 to-red-800/50 border-red-800/30'} backdrop-blur-sm p-6 rounded-2xl border shadow-lg`}>
+                    {/* Current Profit (Main Card) */}
+                    <div className={`bg-gradient-to-br ${profitStats.current_profit >= 0 ? 'from-emerald-900/50 to-emerald-800/50 border-emerald-800/30' : 'from-red-900/50 to-red-800/50 border-red-800/30'} backdrop-blur-sm p-6 rounded-2xl border shadow-lg lg:col-span-2`}>
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${profitStats.current_profit >= 0 ? 'from-emerald-600 to-emerald-800' : 'from-red-600 to-red-800'} flex items-center justify-center`}>
+                                    <FiTrendingUp className="text-white text-xl" />
+                                </div>
+                                <div>
+                                    <h3 className={`${profitStats.current_profit >= 0 ? 'text-emerald-300' : 'text-red-300'} text-xs font-bold uppercase tracking-wider`}>Current Net Profit</h3>
+                                    <p className="text-3xl font-black text-white">${profitStats.current_profit.toFixed(2)}</p>
+                                    <p className="text-xs text-gray-400 mt-1">Unsettled Amount</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={handleClearProfit}
+                                className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-6 py-3 rounded-xl text-sm font-bold uppercase tracking-wide transition-all flex items-center gap-2 hover:scale-105 active:scale-95"
+                            >
+                                <FiRefreshCw className="text-lg" /> Clear & Save
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* All Time Profit */}
+                    <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/50 backdrop-blur-sm p-6 rounded-2xl border border-purple-800/30 shadow-lg">
                         <div className="flex items-center gap-3 mb-3">
-                            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${profitStats.total_profit >= 0 ? 'from-emerald-600 to-emerald-800' : 'from-red-600 to-red-800'} flex items-center justify-center`}>
-                                <FiTrendingUp className="text-white" />
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
+                                <FiDatabase className="text-white" />
                             </div>
                             <div>
-                                <h3 className={`${profitStats.total_profit >= 0 ? 'text-emerald-300' : 'text-red-300'} text-xs font-bold uppercase tracking-wider`}>Net Profit</h3>
+                                <h3 className="text-purple-300 text-xs font-bold uppercase tracking-wider">All Time Profit</h3>
                                 <p className="text-2xl font-black text-white">${profitStats.total_profit.toFixed(2)}</p>
                             </div>
                         </div>
                     </div>
-
-                    <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/50 backdrop-blur-sm p-6 rounded-2xl border border-purple-800/30 shadow-lg">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
-                                <FiUsers className="text-white" />
-                            </div>
-                            <div>
-                                <h3 className="text-purple-300 text-xs font-bold uppercase tracking-wider">Active Users</h3>
-                                <p className="text-2xl font-black text-white">{users.length}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-amber-900/50 to-amber-800/50 backdrop-blur-sm p-6 rounded-2xl border border-amber-800/30 shadow-lg">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-600 to-amber-800 flex items-center justify-center">
-                                <MdAttachMoney className="text-white" />
-                            </div>
-                            <div>
-                                <h3 className="text-amber-300 text-xs font-bold uppercase tracking-wider">Pending Withdrawals</h3>
-                                <p className="text-2xl font-black text-white">{withdrawals.filter(w => w.status === 'PENDING').length}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Recent Rounds */}
-                <div className="bg-gradient-to-br from-gray-900/50 to-gray-950/50 backdrop-blur-sm p-6 rounded-2xl border border-gray-800/30 shadow-lg mb-8">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-600 to-cyan-800 flex items-center justify-center">
-                            <MdHistory className="text-white" />
-                        </div>
-                        <h3 className="text-xl font-bold text-white">Recent Rounds Performance</h3>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                        {profitStats.recent_rounds.length === 0 ? (
-                            <div className="col-span-full text-center text-gray-500 py-4">No rounds recorded yet</div>
-                        ) : (
-                            profitStats.recent_rounds.map((r: any) => (
-                                <div key={r.id} className={`p-4 rounded-xl border backdrop-blur-sm text-center ${r.house_profit >= 0 ? 'bg-gradient-to-r from-emerald-900/20 to-emerald-800/10 border-emerald-700/20' : 'bg-gradient-to-r from-red-900/20 to-red-800/10 border-red-700/20'}`}>
-                                    <div className="text-xs text-gray-400 mb-1">Crash Point</div>
-                                    <div className="text-lg font-bold text-white mb-2">{r.crash_point}x</div>
-                                    <div className={`text-sm font-bold ${r.house_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                        ${parseFloat(r.house_profit).toFixed(0)}
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
+                    
                     {/* Settings Panel */}
                     <div className="bg-gradient-to-br from-gray-900/50 to-gray-950/50 backdrop-blur-sm p-6 rounded-2xl border border-gray-800/30 shadow-lg">
                         <div className="flex items-center gap-3 mb-6">
@@ -260,7 +243,7 @@ export default function AdminDashboard() {
                             </div>
                             <h2 className="text-xl font-bold text-white">Game Control Settings</h2>
                         </div>
-
+                        
                         <div className="space-y-6">
                             {/* Desktop Restriction Toggle */}
                             <div className="bg-gradient-to-r from-gray-900 to-gray-950 p-4 rounded-xl border border-gray-800/50">
@@ -270,7 +253,7 @@ export default function AdminDashboard() {
                                         <p className="text-xs text-gray-400">Allow only mobile/tablet devices</p>
                                     </div>
                                     <button
-                                        onClick={() => setSettings({ ...settings, restrict_desktop: !settings.restrict_desktop })}
+                                        onClick={() => setSettings({...settings, restrict_desktop: !settings.restrict_desktop})}
                                         className={`relative w-14 h-7 rounded-full transition-colors ${settings.restrict_desktop ? 'bg-emerald-600' : 'bg-gray-700'}`}
                                     >
                                         <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transform transition-transform ${settings.restrict_desktop ? 'translate-x-8' : 'translate-x-1'}`} />
@@ -285,11 +268,11 @@ export default function AdminDashboard() {
                             <div className="space-y-2">
                                 <label className="block text-gray-300 font-medium">Force Crash Point</label>
                                 <div className="relative">
-                                    <input
-                                        type="number"
+                                    <input 
+                                        type="number" 
                                         step="0.01"
                                         value={settings.force_crash_point}
-                                        onChange={(e) => setSettings({ ...settings, force_crash_point: parseFloat(e.target.value) })}
+                                        onChange={(e) => setSettings({...settings, force_crash_point: parseFloat(e.target.value)})}
                                         className="w-full p-3 pl-10 bg-gradient-to-r from-gray-900 to-gray-950 text-yellow-400 font-bold rounded-xl border border-gray-700/50 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 outline-none"
                                     />
                                     <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-yellow-500">x</div>
@@ -300,26 +283,26 @@ export default function AdminDashboard() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="block text-gray-300 font-medium">House Edge (%)</label>
-                                    <input
+                                    <input 
                                         type="number"
                                         value={settings.house_edge}
-                                        onChange={(e) => setSettings({ ...settings, house_edge: parseFloat(e.target.value) })}
+                                        onChange={(e) => setSettings({...settings, house_edge: parseFloat(e.target.value)})}
                                         className="w-full p-3 bg-gradient-to-r from-gray-900 to-gray-950 text-white rounded-xl border border-gray-700/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="block text-gray-300 font-medium">Max Win ($)</label>
-                                    <input
+                                    <input 
                                         type="number"
                                         value={settings.max_win_limit}
-                                        onChange={(e) => setSettings({ ...settings, max_win_limit: parseFloat(e.target.value) })}
+                                        onChange={(e) => setSettings({...settings, max_win_limit: parseFloat(e.target.value)})}
                                         className="w-full p-3 bg-gradient-to-r from-gray-900 to-gray-950 text-white rounded-xl border border-gray-700/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
                                     />
                                 </div>
                             </div>
 
                             {/* Save Button */}
-                            <button
+                            <button 
                                 onClick={handleSaveSettings}
                                 className="w-full py-4 px-6 bg-gradient-to-r from-orange-600 to-red-600 rounded-xl font-bold text-white uppercase tracking-wider hover:from-orange-500 hover:to-red-500 active:scale-95 transition-all shadow-lg shadow-orange-900/20"
                             >
@@ -332,24 +315,31 @@ export default function AdminDashboard() {
                     <div className="lg:col-span-2 bg-gradient-to-br from-gray-900/50 to-gray-950/50 backdrop-blur-sm rounded-2xl border border-gray-800/30 shadow-lg flex flex-col h-[80vh]">
                         {/* Tabs */}
                         <div className="flex border-b border-gray-800/50">
-                            <button
+                            <button 
                                 onClick={() => setActiveTab('USERS')}
                                 className={`flex-1 flex items-center justify-center gap-3 py-4 font-bold transition-all ${activeTab === 'USERS' ? 'text-blue-400 border-b-2 border-blue-400 bg-gradient-to-b from-blue-900/10 to-transparent' : 'text-gray-500 hover:text-gray-300'}`}
                             >
                                 <FiUsers />
                                 Players ({users.length})
                             </button>
-                            <button
+                            <button 
                                 onClick={() => setActiveTab('WITHDRAWALS')}
                                 className={`flex-1 flex items-center justify-center gap-3 py-4 font-bold transition-all ${activeTab === 'WITHDRAWALS' ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-b from-amber-900/10 to-transparent' : 'text-gray-500 hover:text-gray-300'}`}
                             >
                                 <MdAttachMoney />
-                                Withdrawals
+                                Withdrawals 
                                 {withdrawals.filter(w => w.status === 'PENDING').length > 0 && (
                                     <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">
                                         {withdrawals.filter(w => w.status === 'PENDING').length}
                                     </span>
                                 )}
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('PROFIT_HISTORY')}
+                                className={`flex-1 flex items-center justify-center gap-3 py-4 font-bold transition-all ${activeTab === 'PROFIT_HISTORY' ? 'text-purple-400 border-b-2 border-purple-400 bg-gradient-to-b from-purple-900/10 to-transparent' : 'text-gray-500 hover:text-gray-300'}`}
+                            >
+                                <MdHistory />
+                                Profit History
                             </button>
                         </div>
 
@@ -359,7 +349,7 @@ export default function AdminDashboard() {
                                     {/* Search */}
                                     <div className="relative mb-6">
                                         <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" />
-                                        <input
+                                        <input 
                                             type="text"
                                             placeholder="Search players..."
                                             value={searchQuery}
@@ -368,47 +358,41 @@ export default function AdminDashboard() {
                                         />
                                     </div>
 
-                                    {/* Users Table */}
+                                    {/* Users List */}
                                     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                                         {filteredUsers.map((u) => (
                                             <div key={u.id} className="bg-gradient-to-r from-gray-900/50 to-gray-950/50 p-4 rounded-xl border border-gray-800/50 hover:border-gray-700/50 transition-all">
-                                                <div className="flex justify-between items-start mb-3">
-                                                    <div>
-                                                        <div className="flex items-center gap-3 mb-2">
-                                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center">
-                                                                <span className="font-bold text-white">{u.username.charAt(0).toUpperCase()}</span>
-                                                            </div>
-                                                            <div>
-                                                                <h3 className="font-bold text-white text-lg">{u.username}</h3>
-                                                                <div className="text-xs text-gray-400">📞 {u.phone_number || "N/A"}</div>
+                                                <div className="flex justify-between items-start">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center">
+                                                            <span className="font-bold text-xl text-white">{u.username.charAt(0).toUpperCase()}</span>
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="font-bold text-white text-lg">{u.username}</h3>
+                                                            <div className="text-xs text-gray-400 mt-1">📞 {u.phone_number || "N/A"}</div>
+                                                            <div className="text-sm text-gray-300 mt-2">
+                                                                Bank: <span className="text-blue-400">{u.bank_name || "Not Set"}</span>
                                                             </div>
                                                         </div>
-                                                        {u.bank_name && (
-                                                            <div className="bg-gradient-to-r from-gray-900 to-gray-950 p-3 rounded-lg border border-gray-700/50">
-                                                                <div className="text-white font-bold text-sm mb-1">{u.beneficiary_name}</div>
-                                                                <div className="text-blue-300 text-xs">{u.bank_name} • {u.branch_name}</div>
-                                                                <div className="text-amber-400 font-mono text-xs font-bold mt-1">{u.account_number}</div>
-                                                            </div>
-                                                        )}
                                                     </div>
                                                     <div className="text-right">
-                                                        <div className="text-2xl font-black font-mono text-emerald-400 mb-3">${u.balance.toFixed(2)}</div>
+                                                        <div className="text-2xl font-black font-mono text-emerald-400 mb-4">${u.balance.toFixed(2)}</div>
                                                         <div className="flex flex-col gap-2">
-                                                            <input
+                                                            <input 
                                                                 type="number"
                                                                 placeholder="Amount"
                                                                 className="w-32 px-3 py-2 bg-gradient-to-r from-gray-900 to-gray-950 text-white rounded-lg border border-gray-700/50 text-sm"
                                                                 value={topUpAmount[u.id] || ''}
-                                                                onChange={(e) => setTopUpAmount({ ...topUpAmount, [u.id]: e.target.value })}
+                                                                onChange={(e) => setTopUpAmount({...topUpAmount, [u.id]: e.target.value})}
                                                             />
                                                             <div className="flex gap-2">
-                                                                <button
+                                                                <button 
                                                                     onClick={() => handleTransaction(u.id, u.username, 'ADD')}
                                                                     className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-emerald-700 px-3 py-2 rounded-lg text-xs font-bold hover:from-emerald-500 hover:to-emerald-600"
                                                                 >
                                                                     <FiPlus className="text-xs" /> Add
                                                                 </button>
-                                                                <button
+                                                                <button 
                                                                     onClick={() => handleTransaction(u.id, u.username, 'DEDUCT')}
                                                                     className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 px-3 py-2 rounded-lg text-xs font-bold hover:from-red-500 hover:to-red-600"
                                                                 >
@@ -422,7 +406,7 @@ export default function AdminDashboard() {
                                         ))}
                                     </div>
                                 </>
-                            ) : (
+                            ) : activeTab === 'WITHDRAWALS' ? (
                                 /* Withdrawals Table */
                                 <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                                     {withdrawals.map((w) => (
@@ -431,19 +415,25 @@ export default function AdminDashboard() {
                                                 <div className="flex-1">
                                                     <div className="flex justify-between items-center mb-2">
                                                         <div className="flex items-center gap-3">
-                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${w.status === 'PENDING' ? 'bg-amber-500/20' : w.status === 'APPROVED' ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
-                                                                <MdAttachMoney className={`${w.status === 'PENDING' ? 'text-amber-400' : w.status === 'APPROVED' ? 'text-emerald-400' : 'text-red-400'}`} />
+                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${w.status === 'PENDING' ? 'bg-amber-500/20' : w.status === 'APPROVED' ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
+                                                                <MdAttachMoney className={`${w.status === 'PENDING' ? 'text-amber-400' : w.status === 'APPROVED' ? 'text-emerald-400' : 'text-red-400'} text-lg`} />
                                                             </div>
                                                             <div>
                                                                 <div className="font-bold text-white">{w.username}</div>
-                                                                <div className="text-xs text-gray-500">{new Date(w.request_date).toLocaleDateString()}</div>
+                                                                <div className="text-xs text-gray-500">
+                                                                    {new Date(w.request_date).toLocaleDateString('en-US', {
+                                                                        year: 'numeric',
+                                                                        month: 'short',
+                                                                        day: 'numeric'
+                                                                    })}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                         <div className="text-2xl font-black font-mono text-amber-400">${parseFloat(w.amount).toFixed(2)}</div>
                                                     </div>
                                                     <div className="bg-gradient-to-r from-gray-900 to-gray-950 p-3 rounded-lg border border-gray-700/50">
                                                         <div className="text-gray-400 text-xs mb-1">Bank Details:</div>
-                                                        <div className="text-white text-sm">{w.bank_snapshot}</div>
+                                                        <div className="text-white text-sm break-words">{w.bank_snapshot}</div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -453,13 +443,13 @@ export default function AdminDashboard() {
                                                 </span>
                                                 {w.status === 'PENDING' && (
                                                     <div className="flex gap-2">
-                                                        <button
+                                                        <button 
                                                             onClick={() => handleWithdrawalAction(w.id, 'APPROVE')}
                                                             className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-2 rounded-lg text-sm font-bold hover:from-emerald-500 hover:to-emerald-600"
                                                         >
                                                             <FiCheck /> Approve
                                                         </button>
-                                                        <button
+                                                        <button 
                                                             onClick={() => handleWithdrawalAction(w.id, 'REJECT')}
                                                             className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 px-4 py-2 rounded-lg text-sm font-bold hover:from-red-500 hover:to-red-600"
                                                         >
@@ -470,6 +460,45 @@ export default function AdminDashboard() {
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                            ) : (
+                                /* Profit History */
+                                <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                                    {profitStats.history.length === 0 ? (
+                                        <div className="text-center py-8">
+                                            <div className="w-16 h-16 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                <FiCalendar className="text-2xl text-gray-500" />
+                                            </div>
+                                            <p className="text-gray-500 text-sm">No profit history recorded yet</p>
+                                        </div>
+                                    ) : (
+                                        profitStats.history.map((h: any) => (
+                                            <div key={h.id} className="bg-gradient-to-r from-gray-900/50 to-gray-950/50 p-4 rounded-xl border border-gray-800/50 hover:border-gray-700/50 transition-all">
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
+                                                            <FiDollarSign className="text-white text-xl" />
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs text-gray-400 mb-1">Saved to History</div>
+                                                            <div className="text-white font-medium">
+                                                                {new Date(h.created_at).toLocaleString('en-US', {
+                                                                    year: 'numeric',
+                                                                    month: 'short',
+                                                                    day: 'numeric',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-3xl font-black font-mono text-emerald-400">${parseFloat(h.amount).toFixed(2)}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
                             )}
                         </div>

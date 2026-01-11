@@ -34,12 +34,22 @@ class Bet(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class ProfitSettlement(models.Model):
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Settlement: ${self.amount} on {self.created_at}"
+
 class GameRound(models.Model):
     crash_point = models.FloatField()
-    total_bets = models.DecimalField(max_digits=12, decimal_places=2, default=0.00) # Mulu Bet Mudala
-    total_payouts = models.DecimalField(max_digits=12, decimal_places=2, default=0.00) # Gewu Mulu Mudala
-    house_profit = models.DecimalField(max_digits=12, decimal_places=2, default=0.00) # Apa Labha (Bets - Payouts)
+    total_bets = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    total_payouts = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    house_profit = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Link to a settlement (Null means current active profit)
+    settlement = models.ForeignKey(ProfitSettlement, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
         return f"Round {self.id} - Profit: {self.house_profit}"

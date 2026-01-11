@@ -22,4 +22,5 @@ urlpatterns = [
     path('api/admin/add-balance/', admin_add_balance, name='admin_add_balance'),
     path('api/admin/withdrawals/', admin_withdrawals, name='admin_withdrawals'),
     path('api/admin/profit/', admin_profit_stats, name='admin_profit_stats'), # NEW URL
+    path('api/admin/profit/clear/', admin_clear_profit, name='admin_clear_profit'), # NEW URL
 ]

@@ -6,7 +6,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.decorators import api_view, permission_classes
 from django.contrib.auth.models import User
 from .serializers import RegisterSerializer, UserSerializer, WithdrawalRequestSerializer
-from .models import Profile, GameSettings, WithdrawalRequest, GameRound
+from .models import Profile, GameSettings, WithdrawalRequest, GameRound,ProfitSettlement
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -103,17 +103,47 @@ def admin_add_balance(request):
 @api_view(['GET'])
 @permission_classes([IsAdminUser])
 def admin_profit_stats(request):
-    # Calculate ALL time stats
-    total_bets = GameRound.objects.aggregate(Sum('total_bets'))['total_bets__sum'] or 0.00
+    # 1. Current Active Profit (Not yet cleared)
+    # settlement=None වන රවුන්ඩ්ස් වල එකතුව
+    current_profit = GameRound.objects.filter(settlement__isnull=True).aggregate(Sum('house_profit'))['house_profit__sum'] or 0.00
+    
+    # 2. Total All Time Profit
     total_profit = GameRound.objects.aggregate(Sum('house_profit'))['house_profit__sum'] or 0.00
     
-    # Get last 10 rounds for chart (optional, but good for simple view)
-    last_rounds = GameRound.objects.all().order_by('-id')[:5].values('id', 'total_bets', 'house_profit', 'crash_point')
+    # 3. Total Bets (Active Period)
+    current_bets = GameRound.objects.filter(settlement__isnull=True).aggregate(Sum('total_bets'))['total_bets__sum'] or 0.00
+
+    # 4. History (Settlements)
+    settlement_history = ProfitSettlement.objects.all().order_by('-created_at').values('id', 'amount', 'created_at')
 
     return Response({
-        "total_bets": float(total_bets),
+        "current_profit": float(current_profit),
         "total_profit": float(total_profit),
-        "recent_rounds": list(last_rounds)
+        "current_bets": float(current_bets),
+        "history": list(settlement_history)
+    })
+
+# --- NEW: CLEAR PROFIT API ---
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def admin_clear_profit(request):
+    # Calculate current unsettled profit
+    unsettled_rounds = GameRound.objects.filter(settlement__isnull=True)
+    current_profit = unsettled_rounds.aggregate(Sum('house_profit'))['house_profit__sum'] or 0.00
+
+    if current_profit == 0:
+        return Response({"error": "No profit to clear"}, status=400)
+
+    # 1. Create a Settlement Record (History)
+    settlement = ProfitSettlement.objects.create(amount=current_profit)
+
+    # 2. Mark all these rounds as 'Settled'
+    unsettled_rounds.update(settlement=settlement)
+
+    return Response({
+        "message": "Profit Cleared Successfully!",
+        "cleared_amount": float(current_profit),
+        "date": settlement.created_at
     })
 
 @api_view(['GET', 'POST'])
