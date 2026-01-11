@@ -33,6 +33,17 @@ class Bet(models.Model):
     profit = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     created_at = models.DateTimeField(auto_now_add=True)
 
+
+class GameRound(models.Model):
+    crash_point = models.FloatField()
+    total_bets = models.DecimalField(max_digits=12, decimal_places=2, default=0.00) # Mulu Bet Mudala
+    total_payouts = models.DecimalField(max_digits=12, decimal_places=2, default=0.00) # Gewu Mulu Mudala
+    house_profit = models.DecimalField(max_digits=12, decimal_places=2, default=0.00) # Apa Labha (Bets - Payouts)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Round {self.id} - Profit: {self.house_profit}"
+
 class WithdrawalRequest(models.Model):
     STATUS_CHOICES = (('PENDING', 'Pending'), ('APPROVED', 'Approved'), ('REJECTED', 'Rejected'))
     user = models.ForeignKey(User, on_delete=models.CASCADE)

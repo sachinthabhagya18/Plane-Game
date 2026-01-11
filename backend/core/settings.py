@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-29375=))ep7z0i=0k(@(-(da^m11uro=d(_(qyl8)&rve-j-d-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['164.68.123.57', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['1xplane.com', 'www.1xplane.com', 'localhost', '127.0.0.1', '164.68.123.57']
 
 
 # Application definition
@@ -158,17 +158,19 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 ASGI_APPLICATION = 'core.asgi.application'
 
 # Channels Redis Config
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
-        },
-    },
-}
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels_redis.core.RedisChannelLayer",
+#         "CONFIG": {
+#             "hosts": [("127.0.0.1", 6379)],
+#         },
+#     },
+# }
 
 # CORS Settings (Next.js එකට ඉඩ දීමට)
 CORS_ALLOWED_ORIGINS = [
+    "https://1xplane.com",
+    "https://www.1xplane.com",
     "http://localhost:3000",
 ]
 
@@ -192,10 +194,6 @@ REST_FRAMEWORK = {
     ),
 }
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
 
 # (Optional) ඕනෑම තැනක සිට එන්න දෙනවා නම් (Testing only):
 CORS_ALLOW_ALL_ORIGINS = True
@@ -206,3 +204,8 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
 }
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://1xplane.com",
+    "https://www.1xplane.com",
+]

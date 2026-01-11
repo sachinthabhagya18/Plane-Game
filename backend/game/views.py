@@ -1,11 +1,12 @@
 from rest_framework import generics
+from django.db.models import Sum
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.decorators import api_view, permission_classes
 from django.contrib.auth.models import User
 from .serializers import RegisterSerializer, UserSerializer, WithdrawalRequestSerializer
-from .models import Profile, GameSettings, WithdrawalRequest
+from .models import Profile, GameSettings, WithdrawalRequest, GameRound
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -96,6 +97,24 @@ def admin_add_balance(request):
         profile.save()
         return Response({"message": "Balance updated"})
     except: return Response({"error": "Failed"}, status=400)
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_profit_stats(request):
+    # Calculate ALL time stats
+    total_bets = GameRound.objects.aggregate(Sum('total_bets'))['total_bets__sum'] or 0.00
+    total_profit = GameRound.objects.aggregate(Sum('house_profit'))['house_profit__sum'] or 0.00
+    
+    # Get last 10 rounds for chart (optional, but good for simple view)
+    last_rounds = GameRound.objects.all().order_by('-id')[:5].values('id', 'total_bets', 'house_profit', 'crash_point')
+
+    return Response({
+        "total_bets": float(total_bets),
+        "total_profit": float(total_profit),
+        "recent_rounds": list(last_rounds)
+    })
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAdminUser])

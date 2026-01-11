@@ -20,7 +20,9 @@ import {
     FiHeart,
     FiAlertCircle,
     FiBarChart2,
-    FiClock
+    FiClock,
+    FiHome,
+    FiInfo
 } from 'react-icons/fi';
 import {
     MdFlight,
@@ -70,13 +72,16 @@ export default function Aviator() {
     // Mobile UI State
     const [showMobileBets, setShowMobileBets] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
+    const [activeMobileTab, setActiveMobileTab] = useState<'game' | 'bets' | 'history'>('game');
 
     // Canvas Ref for Animation
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const [isMobile, setIsMobile] = useState(false);
 
     const quickBets = [10, 20, 50, 100, 200, 500];
-    const WS_URL = 'ws://164.68.123.57:8000/ws/game/';
+    const WS_URL = 'wss://1xplane.com/ws/game/';
+    const API_URL = 'https://1xplane.com';
 
     const { sendMessage, lastJsonMessage } = useWebSocket(WS_URL, {
         onOpen: () => console.log('Connected to Game Server'),
@@ -87,6 +92,7 @@ export default function Aviator() {
     useEffect(() => {
         setIsClient(true);
         checkDeviceRestriction();
+        checkIfMobile();
 
         const storedToken = localStorage.getItem('access_token');
         if (!storedToken) {
@@ -95,11 +101,19 @@ export default function Aviator() {
             setToken(storedToken);
             fetchUserData(storedToken);
         }
+
+        // Check for mobile resize
+        window.addEventListener('resize', checkIfMobile);
+        return () => window.removeEventListener('resize', checkIfMobile);
     }, []);
+
+    const checkIfMobile = () => {
+        setIsMobile(window.innerWidth < 1024);
+    };
 
     const checkDeviceRestriction = async () => {
         try {
-            const res = await axios.get('http://164.68.123.57:8000/api/public/settings/');
+            const res = await axios.get(`${API_URL}/api/public/settings/`);
             if (res.data.restrict_desktop) {
                 if (window.innerWidth > 1024) {
                     setIsBlocked(true);
@@ -112,7 +126,7 @@ export default function Aviator() {
 
     const fetchUserData = async (authToken: string) => {
         try {
-            const res = await axios.get('http://164.68.123.57:8000/api/user/', {
+            const res = await axios.get(`${API_URL}/api/user/`, {
                 headers: { Authorization: `Bearer ${authToken}` }
             });
             setUsername(res.data.username);
@@ -140,7 +154,7 @@ export default function Aviator() {
         router.push('/profile');
     };
 
-    // --- CANVAS ANIMATION LOGIC ---
+    // --- CANVAS ANIMATION LOGIC (Mobile Optimized) ---
     useEffect(() => {
         const canvas = canvasRef.current;
         const container = containerRef.current;
@@ -149,10 +163,15 @@ export default function Aviator() {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // Resize Canvas
+        // Resize Canvas with mobile optimization
         const resizeCanvas = () => {
             canvas.width = container.clientWidth;
             canvas.height = container.clientHeight;
+
+            // Mobile optimization: Adjust for smaller screens
+            if (window.innerWidth < 768) {
+                // For mobile, we adjust rendering for better visibility
+            }
         };
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
@@ -181,76 +200,47 @@ export default function Aviator() {
             ctx.lineTo(1, h);
             ctx.stroke();
 
-            // Draw grid lines
+            // Draw grid lines (fewer on mobile for better performance)
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
             ctx.beginPath();
+
+            // Adjust grid density based on screen size
+            const gridSizeX = isMobile ? 80 : 100;
+            const gridSizeY = isMobile ? 60 : 80;
+
             // Vertical lines
-            for (let x = 0; x < w; x += 100) {
+            for (let x = 0; x < w; x += gridSizeX) {
                 ctx.moveTo(x, 0);
                 ctx.lineTo(x, h);
             }
             // Horizontal lines
-            for (let y = h; y > 0; y -= 80) {
+            for (let y = h; y > 0; y -= gridSizeY) {
                 ctx.moveTo(0, y);
                 ctx.lineTo(w, y);
             }
             ctx.stroke();
 
             if (status === "WAITING") {
-                // Loading Animation
-                ctx.font = "bold 16px 'Inter', sans-serif";
+                // Mobile optimized waiting text
+                if (isMobile) {
+                    ctx.font = "bold 14px 'Inter', sans-serif";
+                } else {
+                    ctx.font = "bold 16px 'Inter', sans-serif";
+                }
                 ctx.fillStyle = "#6B7280";
                 ctx.textAlign = "center";
-                // ctx.fillText("WAITING FOR NEXT ROUND", w / 2, h / 2 + 50);
-
-                // Loading bar
-                // const time = Date.now() / 1000;
-                // const barWidth = 150;
-                // const progress = (Math.sin(time * 3) + 1) / 2;
-
-                // ctx.fillStyle = "#333";
-                // ctx.fillRect(w / 2 - barWidth / 2, h / 2 + 65, barWidth, 4);
-
-                // ctx.fillStyle = "#DC2626";
-                // ctx.fillRect(w / 2 - barWidth / 2, h / 2 + 65, barWidth * progress, 4);
-
                 return;
             }
 
-            // --- CHART LOGIC ---
-            // Realistic exponential curve
-            const maxTime = 10; // "Time" to reach right side
-            // Map multiplier to progress (0 to 1) along curve path
-            // Logarithmic scale fits multiplier better visually
+            // --- CHART LOGIC (Optimized for mobile - FIXED VIEW) ---
+            // For mobile, we use a fixed viewport that shows the chart properly
             const progress = Math.min((Math.log(multiplier) / Math.log(100)) * 1.5, 1.0);
-            // Fallback linear for short flights if needed, but log looks more "chart-like"
 
-            // Adjust X and Y to look like a graph
-            const startX = 0;
-            const startY = h;
-
-            // X moves linearly with time/progress
-            // Y moves exponentially to represent multiplier
-            const endX = w * progress;
-            // Map multiplier 1.00 -> h, High multiplier -> 0
-            // We use a curve function: y = h - (h * (1 - 1/x)) kinda logic or simple bezier
-
-            // Bezier Control Point for that "swoosh" look
-            const cpX = endX * 0.5;
-            const cpY = h;
-
-            // Simple Quadratic looks good:
-            // P0=(0,h), P1=(endX, h), P2=(endX, endY) -> Not quite right
-            // Let's use computed points based on chart
-
-            const pointX = w * Math.min((multiplier - 1) / 5, 0.9); // scales x
-            // Ensure Y goes up. 
-            // Let's stick to the previous smooth bezier but refined
+            // Adjust X and Y for mobile with fixed positioning
+            // We ensure the chart always has enough space
             const graphX = w * 0.05 + (w * 0.9 * Math.min((multiplier - 1) / 8, 1));
-            const graphY = h - (50 + (h * 0.8 * Math.min((multiplier - 1) / 4, 1))); // Caps at top
-
-            // Let's try a different approach for "Real Graph" feel
-            // We draw the line from 0,0 (bottom left) to current point
+            // Fixed Y position so chart doesn't go too high on mobile
+            const graphY = h - (isMobile ? 40 : 50) - (h * 0.7 * Math.min((multiplier - 1) / 4, 1));
 
             if (status === "FLYING" || status === "CRASHED") {
                 // 1. Draw The Area Under Curve
@@ -258,7 +248,6 @@ export default function Aviator() {
                 ctx.moveTo(0, h);
 
                 // Curve to current point
-                // Using bezier to simulate the "knee" of the curve
                 ctx.quadraticCurveTo(graphX * 0.6, h, graphX, graphY);
 
                 // Close path for fill
@@ -269,11 +258,11 @@ export default function Aviator() {
                 // Gradient Fill (Red Fade)
                 const fillGradient = ctx.createLinearGradient(0, 0, 0, h);
                 if (status === "CRASHED") {
-                    fillGradient.addColorStop(0, 'rgba(100, 100, 100, 0.1)'); // Greyed out
+                    fillGradient.addColorStop(0, 'rgba(100, 100, 100, 0.1)');
                     fillGradient.addColorStop(1, 'rgba(100, 100, 100, 0)');
                 } else {
-                    fillGradient.addColorStop(0, 'rgba(220, 38, 38, 0.6)'); // Bright Red
-                    fillGradient.addColorStop(1, 'rgba(220, 38, 38, 0)');   // Transparent
+                    fillGradient.addColorStop(0, 'rgba(220, 38, 38, 0.6)');
+                    fillGradient.addColorStop(1, 'rgba(220, 38, 38, 0)');
                 }
                 ctx.fillStyle = fillGradient;
                 ctx.fill();
@@ -283,50 +272,51 @@ export default function Aviator() {
                 ctx.moveTo(0, h);
                 ctx.quadraticCurveTo(graphX * 0.6, h, graphX, graphY);
 
-                ctx.strokeStyle = status === "CRASHED" ? '#555' : '#DC2626'; // Red Line
-                ctx.lineWidth = 5;
+                ctx.strokeStyle = status === "CRASHED" ? '#555' : '#DC2626';
+                ctx.lineWidth = isMobile ? 3 : 5;
                 ctx.lineCap = 'round';
                 ctx.stroke();
 
-                // 3. Draw The Plane (Better Shape)
+                // 3. Draw The Plane (Optimized for mobile - FIXED SIZE)
                 if (status === "FLYING") {
                     ctx.save();
                     ctx.translate(graphX, graphY);
 
                     // Rotate slightly up
-                    const slope = (h - graphY) / (graphX + 1); // Simple slope proxy
-                    const angle = -Math.atan(slope * 0.05) - 0.1; // Slight tilt up
+                    const slope = (h - graphY) / (graphX + 1);
+                    const angle = -Math.atan(slope * 0.05) - 0.1;
 
                     ctx.rotate(angle);
 
-                    const scale = 0.6; // Slightly smaller, crisper
+                    // Adjust scale for mobile - FIXED for better visibility
+                    const scale = isMobile ? 0.5 : 0.6;
                     ctx.scale(scale, scale);
 
                     // --- DRAW PLANE (Red Vector Style) ---
                     ctx.shadowColor = "rgba(220, 38, 38, 0.8)";
-                    ctx.shadowBlur = 20;
+                    ctx.shadowBlur = isMobile ? 15 : 20;
 
-                    ctx.fillStyle = "#DC2626"; // Main Red
+                    ctx.fillStyle = "#DC2626";
 
                     // Fuselage
                     ctx.beginPath();
-                    ctx.moveTo(40, 0); // Nose
-                    ctx.bezierCurveTo(20, -15, -20, -15, -40, -5); // Top
-                    ctx.lineTo(-40, 10); // Back
-                    ctx.bezierCurveTo(-20, 15, 20, 15, 40, 0); // Bottom
+                    ctx.moveTo(40, 0);
+                    ctx.bezierCurveTo(20, -15, -20, -15, -40, -5);
+                    ctx.lineTo(-40, 10);
+                    ctx.bezierCurveTo(-20, 15, 20, 15, 40, 0);
                     ctx.fill();
 
-                    // Wings (Side/Top Hybrid View)
-                    ctx.fillStyle = "#991B1B"; // Darker Red for depth
+                    // Wings
+                    ctx.fillStyle = "#991B1B";
                     ctx.beginPath();
                     ctx.moveTo(-10, -5);
-                    ctx.lineTo(-30, -40); // Top Wing Tip
+                    ctx.lineTo(-30, -40);
                     ctx.lineTo(-10, -5);
                     ctx.fill();
 
                     ctx.beginPath();
                     ctx.moveTo(-10, 5);
-                    ctx.lineTo(-35, 25); // Bottom Wing Tip
+                    ctx.lineTo(-35, 25);
                     ctx.lineTo(-15, 5);
                     ctx.fill();
 
@@ -337,7 +327,7 @@ export default function Aviator() {
                     ctx.lineTo(-45, 0);
                     ctx.fill();
 
-                    // Propeller Blur (White circle)
+                    // Propeller Blur
                     ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
                     ctx.beginPath();
                     ctx.ellipse(42, 0, 5, 25, 0, 0, Math.PI * 2);
@@ -345,14 +335,16 @@ export default function Aviator() {
 
                     ctx.restore();
                 } else if (status === "CRASHED") {
-                    // "Flew Away" text nicely placed near end point
-                    ctx.font = "bold 20px 'Inter', sans-serif";
-                    ctx.fillStyle = "#DC2626";
-                    ctx.textAlign = "right";
-                    ctx.fillText("FLEW AWAY", graphX - 20, graphY);
+                    // "Flew Away" text with mobile optimization
+                    if (!isMobile) {
+                        ctx.font = "bold 20px 'Inter', sans-serif";
+                        ctx.fillStyle = "#DC2626";
+                        ctx.textAlign = "right";
+                        ctx.fillText("FLEW AWAY", graphX - 20, graphY);
+                    }
 
                     // Explosion icon at tip
-                    ctx.font = "40px Arial";
+                    ctx.font = isMobile ? "30px Arial" : "40px Arial";
                     ctx.textAlign = "center";
                     ctx.textBaseline = "middle";
                     ctx.fillText("💥", graphX, graphY);
@@ -361,7 +353,6 @@ export default function Aviator() {
         };
 
         const animationId = requestAnimationFrame(draw);
-        // Continuous Redraw
         const interval = setInterval(() => {
             requestAnimationFrame(draw);
         }, 1000 / 60);
@@ -371,7 +362,7 @@ export default function Aviator() {
             cancelAnimationFrame(animationId);
             clearInterval(interval);
         };
-    }, [status, multiplier]);
+    }, [status, multiplier, isMobile]);
 
     // --- GAME LOGIC ENGINE ---
     useEffect(() => {
@@ -591,6 +582,7 @@ export default function Aviator() {
         </div>
     );
 
+    const newLocal = 0;
     return (
         <div className="flex h-screen bg-gradient-to-br from-[#0A0E17] to-[#111827] text-white font-sans overflow-hidden select-none">
 
@@ -603,7 +595,7 @@ export default function Aviator() {
                             <img
                                 src="https://sachintha.online/wp-content/uploads/2026/01/plane-logo.png.png"
                                 alt="Aviator Logo"
-                                className="w-25  mr-3"
+                                className="w-25 mr-3"
                             />
                         </div>
                     </div>
@@ -662,271 +654,433 @@ export default function Aviator() {
             {/* --- MAIN CONTENT --- */}
             <div className="flex-1 flex flex-col relative h-full overflow-hidden">
 
-                {/* 1. HEADER */}
-                <div className="absolute top-0 left-0 right-0 h-20 flex justify-between items-center px-6 z-20 bg-gradient-to-b from-black/80 via-black/40 to-transparent pointer-events-none">
-                    {/* Left Section */}
-                    <div className="pointer-events-auto flex items-center gap-4">
-                        <button
-                            onClick={() => setShowMobileBets(true)}
-                            className="lg:hidden w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 backdrop-blur-sm border border-blue-500/30 flex items-center justify-center text-xl hover:from-blue-500/30 hover:to-blue-600/30 active:scale-95 transition-all shadow-lg"
-                        >
-                            <FiUsers />
-                        </button>
-                        <div className="lg:hidden flex items-center">
-                            <div className="w-10 h-10 mr-3 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center shadow-lg">
-                                <MdFlight className="text-xl text-white" />
-                            </div>
-                            <div className="flex flex-col">
-                                <h1 className="text-lg font-black bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
-                                    1XPlane
-                                </h1>
-                                <span className="text-[10px] text-gray-400">Mobile Mode</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Center - History */}
-                    <div className="hidden md:flex gap-2 pointer-events-auto mask-linear-fade max-w-xl overflow-hidden">
-                        {history.slice(0, 10).map((h, i) => (
-                            <div
-                                key={i}
-                                className={`px-4 py-2 rounded-xl text-sm font-bold backdrop-blur-md border transition-all hover:scale-105
-                                    ${h < 2.0
-                                        ? 'bg-gradient-to-r from-blue-500/10 to-blue-600/10 text-blue-300 border-blue-500/30'
-                                        : h < 5.0
-                                            ? 'bg-gradient-to-r from-purple-500/10 to-purple-600/10 text-purple-300 border-purple-500/30'
-                                            : 'bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 text-emerald-300 border-emerald-500/30'
-                                    }
-                                `}
-                            >
-                                {h.toFixed(2)}x
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Right Section */}
-                    <div className="pointer-events-auto flex items-center gap-4">
-                        {/* Balance */}
-                        <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 backdrop-blur-sm border border-blue-500/30 px-4 py-3 rounded-xl flex flex-col items-end shadow-lg">
-                            <span className="text-xs text-blue-300 uppercase font-bold tracking-wider flex items-center gap-1">
-                                <FiDollarSign /> Balance
-                            </span>
-                            <span className="text-xl font-black font-mono text-white">${balance.toFixed(2)}</span>
-                        </div>
-
-                        {/* Settings & Actions */}
-                        <div className="flex gap-2">
+                {/* Mobile Navigation Tabs */}
+                {isMobile && (
+                    <div className="lg:hidden fixed top-0 left-0 right-0 h-12 bg-gradient-to-b from-black/95 to-black/80 backdrop-blur-lg z-40 border-b border-gray-800/50">
+                        <div className="flex h-full">
                             <button
-                                onClick={handleLogout}
-                                className="w-12 h-12 rounded-xl bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm border border-gray-700/50 flex items-center justify-center hover:from-red-500/20 hover:to-red-600/20 text-red-400 transition-all active:scale-95 shadow-lg"
+                                onClick={() => setActiveMobileTab('game')}
+                                className={`flex-1 flex flex-col items-center justify-center ${activeMobileTab === 'game' ? 'text-blue-400 border-b-2 border-blue-500' : 'text-gray-400'}`}
                             >
-                                <FiLogOut className="text-lg" />
+                                <MdFlight className="text-base" />
+                                <span className="text-[10px] mt-0.5">Game</span>
+                            </button>
+                            <button
+                                onClick={() => setActiveMobileTab('bets')}
+                                className={`flex-1 flex flex-col items-center justify-center ${activeMobileTab === 'bets' ? 'text-blue-400 border-b-2 border-blue-500' : 'text-gray-400'}`}
+                            >
+                                <FiUsers className="text-base" />
+                                <span className="text-[10px] mt-0.5">Bets</span>
+                            </button>
+                            <button
+                                onClick={() => setActiveMobileTab('history')}
+                                className={`flex-1 flex flex-col items-center justify-center ${activeMobileTab === 'history' ? 'text-blue-400 border-b-2 border-blue-500' : 'text-gray-400'}`}
+                            >
+                                <MdHistory className="text-base" />
+                                <span className="text-[10px] mt-0.5">History</span>
                             </button>
                         </div>
                     </div>
+                )}
+
+                {/* 1. HEADER (Mobile Optimized with Profile Button) */}
+                <div className={`absolute top-0 left-0 right-0 flex justify-between items-center px-3 lg:px-6 z-20 bg-gradient-to-b from-black/80 via-black/40 to-transparent pointer-events-none ${isMobile ? 'h-12 top-12' : 'h-20'}`}>
+                    {/* Left Section */}
+                    <div className="pointer-events-auto flex items-center gap-3">
+                        {!isMobile && (
+                            <button
+                                onClick={() => setShowMobileBets(true)}
+                                className="lg:hidden w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 backdrop-blur-sm border border-blue-500/30 flex items-center justify-center text-xl hover:from-blue-500/30 hover:to-blue-600/30 active:scale-95 transition-all shadow-lg"
+                            >
+                                <FiUsers />
+                            </button>
+                        )}
+                        {isMobile && (
+                            <div className="flex items-center">
+                                <div className="flex flex-col">
+                                    <div className="flex items-center">
+                                        <img
+                                            src="https://sachintha.online/wp-content/uploads/2026/01/plane-logo.png.png"
+                                            alt="Aviator Logo"
+                                            className="w-15 mr-3"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Right Section with Profile Button */}
+                    <div className="pointer-events-auto flex items-center gap-2">
+                        {/* Balance (Compact on mobile) */}
+                        <div className={`bg-gradient-to-r from-blue-500/10 to-cyan-500/10 backdrop-blur-sm border border-blue-500/30 rounded-lg flex flex-col items-end shadow-lg ${isMobile ? 'px-2 py-1.5' : 'px-4 py-3'}`}>
+                            <span className="text-[10px] text-blue-300 uppercase font-bold tracking-wider">
+                                Balance
+                            </span>
+                            <span className={`font-black font-mono text-white ${isMobile ? 'text-sm' : 'text-xl'}`}>${balance.toFixed(2)}</span>
+                        </div>
+
+                        {/* Profile Button (Mobile) */}
+                        {isMobile && (
+                            <button
+                                onClick={handleProfileNav}
+                                className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-600/20 backdrop-blur-sm border border-blue-500/30 flex items-center justify-center text-blue-400 hover:from-blue-500/30 hover:to-blue-600/30 active:scale-95 transition-all shadow-lg"
+                            >
+                                <FiUser className="text-base" />
+                            </button>
+                        )}
+
+                        {/* Settings & Actions */}
+                        {!isMobile && (
+                            <>
+                                <button
+                                    onClick={handleProfileNav}
+                                    className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 backdrop-blur-sm border border-blue-500/30 flex items-center justify-center text-blue-400 hover:from-blue-500/30 hover:to-blue-600/30 active:scale-95 transition-all shadow-lg"
+                                >
+                                    <FiUser className="text-lg" />
+                                </button>
+                                <button
+                                    onClick={handleLogout}
+                                    className="w-12 h-12 rounded-xl bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm border border-gray-700/50 flex items-center justify-center hover:from-red-500/20 hover:to-red-600/20 text-red-400 transition-all active:scale-95 shadow-lg"
+                                >
+                                    <FiLogOut className="text-lg" />
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
 
-                {/* 2. GAME CANVAS (Animation Layer) */}
-                <div ref={containerRef} className="flex-1 relative bg-gradient-to-b from-[#0A0E17] to-[#111827] flex flex-col items-center justify-center overflow-hidden w-full h-full">
+                {/* 2. GAME CANVAS (Mobile Optimized with Fixed Height for Chart) */}
+                <div ref={containerRef} className={`relative bg-gradient-to-b from-[#0A0E17] to-[#111827] flex flex-col items-center justify-center overflow-hidden w-full ${isMobile ? 'mt-12 flex-1 min-h-[300px]' : 'flex-1'}`}>
                     {/* The Canvas itself */}
                     <canvas ref={canvasRef} className="absolute inset-0 z-0" />
 
-                    {/* Central Multiplier Display */}
-                    <div className="z-10 text-center relative pointer-events-none">
+                    {/* Central Multiplier Display (Mobile Optimized) */}
+                    <div className="z-10 text-center relative pointer-events-none px-4">
                         {status === "WAITING" ? (
                             <div className="flex flex-col items-center">
-                                <div className="text-3xl md:text-5xl font-black text-gray-600 mb-6 tracking-tighter animate-pulse">
+                                <div className={`font-black text-gray-600 mb-3 tracking-tighter animate-pulse ${isMobile ? 'text-lg' : 'text-3xl md:text-5xl'}`}>
                                     PREPARING FOR TAKEOFF
                                 </div>
-                                <div className="w-64 h-2 bg-gray-800/50 rounded-full overflow-hidden">
+                                <div className={`bg-gray-800/50 rounded-full overflow-hidden ${isMobile ? 'w-40 h-1' : 'w-64 h-2'}`}>
                                     <div className="h-full bg-gradient-to-r from-blue-500 via-cyan-500 to-blue-500 animate-[width_5s_linear] w-full"></div>
                                 </div>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center">
-                                <div className={`text-8xl md:text-[180px] font-black leading-none tracking-tighter tabular-nums drop-shadow-2xl transition-all duration-150
+                                <div className={`font-black leading-none tracking-tighter tabular-nums drop-shadow-2xl transition-all duration-150
+                                    ${isMobile
+                                        ? 'text-5xl'
+                                        : 'text-8xl md:text-[180px]'
+                                    }
                                     ${status === "CRASHED"
                                         ? "text-gradient-crashed animate-crash"
                                         : "text-gradient-flying"
                                     }`}
                                 >
-                                    {multiplier.toFixed(2)}<span className="text-4xl md:text-6xl">x</span>
+                                    {multiplier.toFixed(2)}<span className={`${isMobile ? 'text-xl' : 'text-4xl md:text-6xl'}`}>x</span>
                                 </div>
                             </div>
                         )}
 
                         {status === "CRASHED" && (
-                            <div className="absolute -bottom-20 left-0 right-0 text-center">
-                                <div className="text-red-400 text-2xl font-black uppercase tracking-[0.2em] animate-pulse drop-shadow-[0_0_20px_rgba(239,68,68,0.7)]">
+                            <div className={`absolute left-0 right-0 text-center ${isMobile ? '-bottom-12' : '-bottom-20'}`}>
+                                <div className={`text-red-400 font-black uppercase tracking-[0.2em] animate-pulse drop-shadow-[0_0_20px_rgba(239,68,68,0.7)] ${isMobile ? 'text-sm' : 'text-2xl'}`}>
                                     PLANE CRASHED!
                                 </div>
                             </div>
                         )}
                     </div>
-                </div>
 
+                    {/* Mobile Bets Panel */}
+                    {isMobile && activeMobileTab === 'bets' && (
+                        <div className="absolute inset-0 z-20 bg-gradient-to-b from-[#0A0E17] to-[#111827] overflow-y-auto pt-4">
+                            <div className="px-4">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                        <FiUsers className="text-blue-400" />
+                                        Live Bets
+                                    </h3>
+                                    <span className="text-xs text-gray-400 bg-white/5 px-3 py-1.5 rounded-full">
+                                        {allBets.length} Active
+                                    </span>
+                                </div>
+                                <div className="space-y-2">
+                                    {renderBetList()}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
-                <div className="bg-gradient-to-t from-[#0F172A]/90 to-[#111827]/90 border-t border-gray-800/50 p-4 shadow-[0_-20px_50px_rgba(0,0,0,0.7)] z-40 relative">
-                    <div className="max-w-4xl mx-auto flex flex-col gap-4">
-
-                        <div className="flex flex-col lg:flex-row gap-4 items-center">
-                            {/* Input Area - Compact */}
-                            <div className="flex-1 bg-gradient-to-br from-gray-900/50 to-gray-950/50 backdrop-blur-sm p-3 rounded-xl border border-gray-800/50 shadow-inner w-full">
-                                <div className="mb-3">
-                                    <div className="text-xs text-gray-400 mb-2 font-medium">BET AMOUNT</div>
-
-                                    {/* Preset Buttons - Compact Grid */}
-                                    <div className="grid grid-cols-6 gap-2 mb-3">
-                                        {quickBets.map(amt => (
-                                            <button
-                                                key={amt}
-                                                onClick={() => setBetAmount(amt)}
-                                                disabled={status !== "WAITING" && !myBet}
-                                                className={`py-2 rounded-lg text-xs font-bold transition-all active:scale-95
-                                    ${betAmount === amt
-                                                        ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/30'
-                                                        : 'bg-gradient-to-br from-gray-800 to-gray-900 text-gray-400 hover:from-gray-700 hover:to-gray-800 hover:text-gray-300 border border-gray-700/50'
-                                                    }
-                                `}
-                                            >
-                                                ${amt}
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    {/* Manual Input Stepper - Compact */}
-                                    <div className="flex items-center bg-gradient-to-r from-gray-900 to-gray-950 rounded-xl border border-gray-700/50 p-1 h-12">
-                                        <button
-                                            onClick={() => setBetAmount(Math.max(1, betAmount - 1))}
-                                            className="w-10 h-full rounded-lg bg-gradient-to-b from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-400 hover:text-white transition-all text-xl font-bold active:scale-95 border-r border-gray-700/50"
+                    {/* Mobile History Panel */}
+                    {isMobile && activeMobileTab === 'history' && (
+                        <div className="absolute inset-0 z-20 bg-gradient-to-b from-[#0A0E17] to-[#111827] overflow-y-auto pt-4">
+                            <div className="px-4">
+                                <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-4">
+                                    <MdHistory className="text-blue-400" />
+                                    Recent History
+                                </h3>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {history.slice(0, 12).map((h, i) => (
+                                        <div
+                                            key={i}
+                                            className={`px-2 py-2 rounded-lg text-center font-bold backdrop-blur-md border text-sm
+                                                ${h < 2.0
+                                                    ? 'bg-gradient-to-r from-blue-500/10 to-blue-600/10 text-blue-300 border-blue-500/30'
+                                                    : h < 5.0
+                                                        ? 'bg-gradient-to-r from-purple-500/10 to-purple-600/10 text-purple-300 border-purple-500/30'
+                                                        : 'bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 text-emerald-300 border-emerald-500/30'
+                                                }
+                                            `}
                                         >
-                                            <FiChevronDown className="inline-block" />
-                                        </button>
-                                        <div className="flex-1 flex flex-col items-center justify-center">
-                                            <div className="text-xs text-gray-500 mb-1">AMOUNT</div>
-                                            <input
-                                                type="number"
-                                                value={betAmount}
-                                                onChange={(e) => setBetAmount(parseFloat(e.target.value))}
-                                                className="w-full bg-transparent text-center text-white font-bold text-xl outline-none font-mono"
-                                            />
+                                            <div className="">{h.toFixed(2)}x</div>
                                         </div>
-                                        <button
-                                            onClick={() => setBetAmount(betAmount + 1)}
-                                            className="w-10 h-full rounded-lg bg-gradient-to-b from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-400 hover:text-white transition-all text-xl font-bold active:scale-95 border-l border-gray-700/50"
-                                        >
-                                            <FiChevronUp className="inline-block" />
-                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* 3. BETTING CONTROLS (Mobile Optimized - Always Visible) */}
+                {(!isMobile || (isMobile && activeMobileTab === 'game')) && (
+                    <div className={`bg-gradient-to-t from-[#0F172A]/95 to-[#111827]/95 border-t border-gray-800/50 z-40 relative ${isMobile ? 'p-3' : 'p-4'}`}>
+                        <div className="max-w-4xl mx-auto">
+                            <div className="flex flex-col lg:flex-row gap-3 items-center">
+                                {/* Input Area - Mobile Optimized */}
+                                <div className="flex-1 bg-gradient-to-br from-gray-900/60 to-gray-950/60 backdrop-blur-sm p-3 rounded-xl border border-gray-800/50 shadow-inner w-full">
+                                    <div className="mb-2">
+                                        <div className="text-xs text-gray-400 mb-2 font-medium">BET AMOUNT</div>
+
+                                        {/* Preset Buttons - Responsive Grid */}
+                                        <div className={`grid ${isMobile ? 'grid-cols-3' : 'grid-cols-6'} gap-2 mb-3`}>
+                                            {quickBets.map(amt => (
+                                                <button
+                                                    key={amt}
+                                                    onClick={() => setBetAmount(amt)}
+                                                    disabled={status !== "WAITING" && !myBet}
+                                                    className={`py-2 rounded-lg text-xs font-bold transition-all active:scale-95
+                                                        ${betAmount === amt
+                                                            ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md shadow-blue-500/20'
+                                                            : 'bg-gradient-to-br from-gray-800 to-gray-900 text-gray-400 hover:from-gray-700 hover:to-gray-800 hover:text-gray-300 border border-gray-700/50'
+                                                        }
+                                                    `}
+                                                >
+                                                    ${amt}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Manual Input Stepper - Compact for mobile */}
+                                        <div className="flex items-center bg-gradient-to-r from-gray-900 to-gray-950 rounded-xl border border-gray-700/50 p-1 h-10">
+                                            <button
+                                                onClick={() => setBetAmount(Math.max(1, betAmount - 1))}
+                                                className="w-8 h-full rounded-lg bg-gradient-to-b from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-400 hover:text-white transition-all text-lg font-bold active:scale-95 border-r border-gray-700/50"
+                                            >
+                                                <FiChevronDown className="inline-block" />
+                                            </button>
+                                            <div className="flex-1 flex flex-col items-center justify-center">
+                                                <div className="text-[10px] text-gray-500">AMOUNT</div>
+                                                <input
+                                                    type="number"
+                                                    value={betAmount}
+                                                    onChange={(e) => setBetAmount(parseFloat(e.target.value))}
+                                                    className="w-full bg-transparent text-center text-white font-bold text-lg outline-none font-mono"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={() => setBetAmount(betAmount + 1)}
+                                                className="w-8 h-full rounded-lg bg-gradient-to-b from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-400 hover:text-white transition-all text-lg font-bold active:scale-95 border-l border-gray-700/50"
+                                            >
+                                                <FiChevronUp className="inline-block" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* ACTION BUTTON (Mobile Optimized) */}
+                                <div className={`relative group ${isMobile ? 'w-full' : 'w-full lg:w-72'}`}>
+                                    <div className={`absolute inset-0 rounded-xl blur-lg opacity-30 group-hover:opacity-40 transition-opacity duration-500
+                                        ${btn.text === "PLACE BET"
+                                            ? 'bg-gradient-to-r from-blue-500 via-cyan-500 to-blue-500'
+                                            : btn.text.includes("CASH OUT")
+                                                ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-red-500'
+                                                : btn.text.includes("CASHED OUT")
+                                                    ? 'bg-gradient-to-r from-emerald-500 to-green-600'
+                                                    : 'bg-gradient-to-r from-red-500 to-red-700'
+                                        }
+                                    `}></div>
+
+                                    <button
+                                        onClick={handleAction}
+                                        disabled={btn.disabled}
+                                        className={`relative w-full rounded-xl flex flex-col items-center justify-center transition-all duration-150 overflow-hidden group
+                                            ${btn.color}
+                                            ${!btn.disabled ? 'hover:scale-[1.02] active:scale-95' : ''}
+                                            ${isMobile ? 'h-14' : 'h-20'}
+                                        `}
+                                    >
+                                        {/* Shine Effect */}
+                                        <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/20 to-transparent"></div>
+
+                                        {/* Icon and Text */}
+                                        <div className="flex items-center justify-center gap-2 z-10">
+                                            <span className={`font-black tracking-wide text-white drop-shadow-lg ${isMobile ? 'text-base' : 'text-xl lg:text-2xl'}`}>
+                                                {btn.text}
+                                            </span>
+                                        </div>
+
+                                        {btn.subtext && (
+                                            <span className="text-xs font-bold text-white/90 mt-1 z-10 bg-black/30 px-3 py-1 rounded-full">
+                                                {btn.subtext}
+                                            </span>
+                                        )}
+
+                                        {/* Hover effect */}
+                                        {!btn.disabled && (
+                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                                        )}
+
+                                        {/* Glow border */}
+                                        <div className="absolute inset-0 rounded-xl border border-white/10 pointer-events-none"></div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 4. FOOTER (Separate for Mobile and Desktop) */}
+                {!isMobile ? (
+                    /* Desktop Footer */
+                    <footer className="bg-gradient-to-t from-[#0A0E17] to-transparent py-6 border-t border-gray-900/50 mt-auto z-30">
+                        <div className="max-w-7xl mx-auto px-6">
+                            {/* Bottom Bar */}
+                            <div className="pt-6 border-t border-gray-900/50">
+                                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                                    <div className="flex items-center gap-6 text-sm text-gray-500">
+                                        <div className="flex items-center gap-2">
+                                            <FiShield className="text-emerald-500" />
+                                            <span>Provably Fair Gaming</span>
+                                        </div>
+                                        <div className="hidden md:flex items-center gap-2">
+                                            <FiHeart className="text-red-400" />
+                                            <span>Play Responsibly</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
+                                        <span className="text-gray-500">© {new Date().getFullYear()} 1XPlane Game</span>
+                                        <span className="text-gray-700">•</span>
+                                        <a href="#" className="text-blue-400 hover:text-blue-300 transition-colors">Terms</a>
+                                        <span className="text-gray-700">•</span>
+                                        <a href="#" className="text-blue-400 hover:text-blue-300 transition-colors">Privacy</a>
+                                        <span className="text-gray-700">•</span>
+                                        <a href="#" className="text-blue-400 hover:text-blue-300 transition-colors">Support</a>
+                                    </div>
+
+                                    <div className="text-xs text-gray-600">
+                                        License #GAM-2024-7890 • v2.0.1
                                     </div>
                                 </div>
                             </div>
-
-                            {/* COMPACT ACTION BUTTON */}
-                            <div className="w-full lg:w-72 relative group">
-                                <div className={`absolute inset-0 rounded-xl blur-xl opacity-40 group-hover:opacity-60 transition-opacity duration-500
-                    ${btn.text === "PLACE BET"
-                                        ? 'bg-gradient-to-r from-blue-500 via-cyan-500 to-blue-500'
-                                        : btn.text.includes("CASH OUT")
-                                            ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-red-500'
-                                            : btn.text.includes("CASHED OUT")
-                                                ? 'bg-gradient-to-r from-emerald-500 to-green-600'
-                                                : 'bg-gradient-to-r from-red-500 to-red-700'
-                                    }
-                `}></div>
-
-                                <button
-                                    onClick={handleAction}
-                                    disabled={btn.disabled}
-                                    className={`relative w-full h-20 rounded-xl flex flex-col items-center justify-center transition-all duration-150 overflow-hidden group
-                        ${btn.color}
-                        ${!btn.disabled ? 'hover:scale-[1.02] active:scale-95' : ''}
-                    `}
-                                >
-                                    {/* Shine Effect */}
-                                    <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/30 to-transparent"></div>
-
-                                    {/* Icon and Text */}
-                                    <div className="flex items-center justify-center gap-2 z-10">
-                                        <span className="text-xl lg:text-2xl font-black tracking-wide text-white drop-shadow-lg">
-                                            {btn.text}
-                                        </span>
-                                    </div>
-
-                                    {btn.subtext && (
-                                        <span className="text-sm font-bold text-white/90 mt-2 z-10 bg-black/40 px-4 py-1 rounded-full">
-                                            {btn.subtext}
-                                        </span>
-                                    )}
-
-                                    {/* Hover effect */}
-                                    {!btn.disabled && (
-                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-                                    )}
-
-                                    {/* Glow border */}
-                                    <div className="absolute inset-0 rounded-xl border-2 border-white/20 pointer-events-none"></div>
-                                </button>
+                        </div>
+                    </footer>
+                ) : (newLocal)
+                    /* Mobile Footer - Compact with Logout Button */}
+                <div className="lg:hidden bg-gradient-to-t from-[#0A0E17]/90 to-transparent py-3 border-t border-gray-900/50 z-30">
+                    <div className="px-3">
+                        {/* Mobile Footer Content - Ultra Compact */}
+                        <div className="flex flex-col items-center gap-2">
+                            {/* Safety Badges - Compact Row */}
+                            <div className="flex justify-center items-center gap-2 w-full">
+                                <span className="text-[10px] text-gray-400 px-2 py-1 bg-white/5 rounded-full border border-white/5 flex items-center gap-1">
+                                    <FiShield className="text-emerald-500 text-xs" /> Fair Play
+                                </span>
+                                <span className="text-[10px] text-gray-400 px-2 py-1 bg-white/5 rounded-full border border-white/5 flex items-center gap-1">
+                                    <FiHeart className="text-red-400 text-xs" /> 18+
+                                </span>
                             </div>
+
+                            {/* Copyright - Single Line */}
+                            <div className="text-center">
+                                <p className="text-[9px] text-gray-500">
+                                    © {new Date().getFullYear()} 1XPlane Game • Play responsibly
+                                </p>
+                            </div>
+
+                            {/* Logout Button - Small */}
+                            <button
+                                onClick={handleLogout}
+                                className="mt-1 px-3 py-1.5 bg-gradient-to-r from-red-500/15 to-red-600/15 rounded-lg text-red-400 text-[10px] font-medium border border-red-500/20 hover:from-red-500/25 hover:to-red-600/25 transition-all active:scale-95 flex items-center gap-1"
+                            >
+                                <FiLogOut className="text-xs" />
+                                Logout
+                            </button>
                         </div>
                     </div>
                 </div>
-
-                {/* 4. FOOTER (At the Bottom) */}
-                <footer className="bg-gradient-to-t from-[#0A0E17] to-transparent py-6 border-t border-gray-900/50 mt-auto z-30">
-                    <div className="max-w-7xl mx-auto px-6">
-                        {/* Bottom Bar */}
-                        <div className="pt-6 border-t border-gray-900/50">
-                            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                                <div className="flex items-center gap-6 text-sm text-gray-500">
-                                    <div className="flex items-center gap-2">
-                                        <FiShield className="text-emerald-500" />
-                                        <span>Provably Fair Gaming</span>
-                                    </div>
-                                    <div className="hidden md:flex items-center gap-2">
-                                        <FiHeart className="text-red-400" />
-                                        <span>Play Responsibly</span>
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
-                                    <span className="text-gray-500">© {new Date().getFullYear()} 1XPlane Game</span>
-                                    <span className="text-gray-700">•</span>
-                                    <a href="#" className="text-blue-400 hover:text-blue-300 transition-colors">Terms</a>
-                                    <span className="text-gray-700">•</span>
-                                    <a href="#" className="text-blue-400 hover:text-blue-300 transition-colors">Privacy</a>
-                                    <span className="text-gray-700">•</span>
-                                    <a href="#" className="text-blue-400 hover:text-blue-300 transition-colors">Support</a>
-                                </div>
-
-                                <div className="text-xs text-gray-600">
-                                    License #GAM-2024-7890 • v2.0.1
-                                </div>
-                            </div>
-
-                        
-                        </div>
-                    </div>
-                </footer>
-
-                {/* Mobile Footer (Simplified) */}
-                <div className="lg:hidden bg-gradient-to-t from-[#0A0E17] to-transparent py-4 border-t border-gray-900/50">
-                    <div className="px-4">
-                        <div className="flex flex-wrap justify-center items-center gap-3 mb-3">
-                            <span className="text-xs text-gray-500 px-3 py-1.5 bg-white/5 rounded-full border border-white/10">
-                                <FiShield className="inline mr-1 text-emerald-500" /> Fair Play
-                            </span>
-                            <span className="text-xs text-gray-500 px-3 py-1.5 bg-white/5 rounded-full border border-white/10">
-                                <FiHeart className="inline mr-1 text-red-400" /> 18+ Only
-                            </span>
-                        </div>
-                        <div className="text-center">
-                            <p className="text-[10px] text-gray-600">
-                                © {new Date().getFullYear()} 1XPlane Game • Play responsibly
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                { }
             </div>
+
+            {/* Add some CSS for the text gradients */}
+            <style jsx global>{`
+                .text-gradient-flying {
+                    background: linear-gradient(135deg, #60a5fa 0%, #22d3ee 50%, #a855f7 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                }
+                
+                .text-gradient-crashed {
+                    background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                }
+                
+                @keyframes crash {
+                    0% { transform: scale(1); opacity: 1; }
+                    50% { transform: scale(1.1); opacity: 0.8; }
+                    100% { transform: scale(1); opacity: 1; }
+                }
+                
+                .animate-crash {
+                    animation: crash 0.5s ease-in-out;
+                }
+                
+                .mask-linear-fade {
+                    mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+                }
+                
+                @media (max-width: 768px) {
+                    .mask-linear-fade {
+                        mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+                    }
+                }
+                
+                .custom-scrollbar {
+                    scrollbar-width: thin;
+                    scrollbar-color: rgba(59, 130, 246, 0.5) transparent;
+                }
+                
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 6px;
+                }
+                
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background-color: rgba(59, 130, 246, 0.5);
+                    border-radius: 20px;
+                }
+                
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background-color: rgba(59, 130, 246, 0.7);
+                }
+            `}</style>
         </div>
     );
 }
