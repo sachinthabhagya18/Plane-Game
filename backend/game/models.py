@@ -34,12 +34,13 @@ class Bet(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+# --- NEW: ලාභය ලබාගත් ඉතිහාසය (History) ---
 class ProfitSettlement(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Settlement: ${self.amount} on {self.created_at}"
+        return f"Settlement: ${self.amount}"
 
 class GameRound(models.Model):
     crash_point = models.FloatField()
@@ -48,7 +49,7 @@ class GameRound(models.Model):
     house_profit = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     created_at = models.DateTimeField(auto_now_add=True)
     
-    # Link to a settlement (Null means current active profit)
+    # මේ වටය අයිති කොයි Settlement එකටද? (Null නම් තාම අරගෙන නෑ - Active Profit)
     settlement = models.ForeignKey(ProfitSettlement, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
@@ -64,3 +65,27 @@ class WithdrawalRequest(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.amount}"
+    
+class GameHistory(models.Model):
+    crash_point = models.FloatField()
+    total_bets_count = models.IntegerField(default=0)
+    total_bet_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    total_payout_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    round_profit = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    
+    # ක්‍රීඩකයින්ගේ විස්තර JSON එකක් ලෙස
+    players_data = models.JSONField(default=list) 
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"History #{self.id} - {self.crash_point}x"
+    
+class SiteVisit(models.Model):
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(null=True, blank=True) # Device info
+    path = models.CharField(max_length=200, default='/')
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Visit: {self.ip_address} at {self.timestamp}"

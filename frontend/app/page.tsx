@@ -82,6 +82,8 @@ export default function Aviator() {
     const quickBets = [10, 20, 50, 100, 200, 500];
     const WS_URL = 'wss://1xplane.com/ws/game/';
     const API_URL = 'https://1xplane.com';
+    // const WS_URL = 'ws://127.0.0.1:8000/ws/game/';
+    // const API_URL = 'http://127.0.0.1:8000';
 
     const { sendMessage, lastJsonMessage } = useWebSocket(WS_URL, {
         onOpen: () => console.log('Connected to Game Server'),
@@ -90,21 +92,20 @@ export default function Aviator() {
 
     // --- INITIAL SETUP ---
     useEffect(() => {
+
         setIsClient(true);
         checkDeviceRestriction();
-        checkIfMobile();
 
         const storedToken = localStorage.getItem('access_token');
-        if (!storedToken) {
-            router.push('/login');
-        } else {
+        
+        // මෙතන තිබුණ if (!storedToken) router.push('/login') කොටස අයින් කළා.
+        if (storedToken) {
             setToken(storedToken);
             fetchUserData(storedToken);
+        } else {
+            setUsername("Guest User"); // Log නොවී ඉන්න අයට නමක්
         }
-
-        // Check for mobile resize
-        window.addEventListener('resize', checkIfMobile);
-        return () => window.removeEventListener('resize', checkIfMobile);
+        axios.post('https://1xplane.com/api/record-visit/', { path: window.location.pathname });
     }, []);
 
     const checkIfMobile = () => {
@@ -145,7 +146,7 @@ export default function Aviator() {
         e.stopPropagation();
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
-        router.push('/login');
+        // router.push('/login');
     };
 
     const handleProfileNav = (e: React.MouseEvent) => {
@@ -422,6 +423,11 @@ export default function Aviator() {
     }, [allBets, username]);
 
     const handleAction = () => {
+        if (!token) {
+            alert("Please login to place a bet!");
+            router.push('/login');
+            return;
+        }
         if (status === "WAITING" && !myBet) {
             if (balance >= betAmount) {
                 setBalance(prev => prev - betAmount);

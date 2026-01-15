@@ -7,7 +7,8 @@ import {
     FiUsers, FiDollarSign, FiTrendingUp, FiSettings,
     FiLogOut, FiSearch, FiCheck, FiX, FiPlus, FiMinus,
     FiHome, FiShield, FiLock, FiUnlock, FiRefreshCw, FiList,
-    FiCalendar, FiDatabase
+    FiCalendar, FiDatabase,
+    FiBarChart2
 } from 'react-icons/fi';
 import { MdAdminPanelSettings, MdAttachMoney, MdHistory } from 'react-icons/md';
 
@@ -86,7 +87,7 @@ export default function AdminDashboard() {
 
     const handleClearProfit = async () => {
         if (!confirm("Are you sure you want to CLEAR current profit? This will move the current amount to history and reset the counter to 0.")) return;
-        
+
         try {
             await axios.post(`${API_URL}/api/admin/profit/clear/`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -158,13 +159,19 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                     <div className="flex gap-3">
-                        <button 
+                        <button
                             onClick={() => router.push('/')}
                             className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-gray-800 to-gray-900 rounded-xl font-semibold border border-gray-700 hover:from-gray-700 hover:to-gray-800 transition-all active:scale-95"
                         >
                             <FiHome /> Game View
                         </button>
-                        <button 
+                        <button
+                            onClick={() => router.push('/admin/analytics')}
+                            className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl font-semibold border border-purple-500/30 hover:from-purple-500 hover:to-purple-600 transition-all active:scale-95 text-white"
+                        >
+                            <FiBarChart2 /> Analytics
+                        </button>
+                        <button
                             onClick={() => { localStorage.clear(); router.push('/admin-login'); }}
                             className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-red-600 to-red-700 rounded-xl font-semibold border border-red-500/30 hover:from-red-500 hover:to-red-600 transition-all active:scale-95"
                         >
@@ -210,7 +217,7 @@ export default function AdminDashboard() {
                                     <p className="text-xs text-gray-400 mt-1">Unsettled Amount</p>
                                 </div>
                             </div>
-                            <button 
+                            <button
                                 onClick={handleClearProfit}
                                 className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-6 py-3 rounded-xl text-sm font-bold uppercase tracking-wide transition-all flex items-center gap-2 hover:scale-105 active:scale-95"
                             >
@@ -234,7 +241,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    
+
                     {/* Settings Panel */}
                     <div className="bg-gradient-to-br from-gray-900/50 to-gray-950/50 backdrop-blur-sm p-6 rounded-2xl border border-gray-800/30 shadow-lg">
                         <div className="flex items-center gap-3 mb-6">
@@ -243,7 +250,7 @@ export default function AdminDashboard() {
                             </div>
                             <h2 className="text-xl font-bold text-white">Game Control Settings</h2>
                         </div>
-                        
+
                         <div className="space-y-6">
                             {/* Desktop Restriction Toggle */}
                             <div className="bg-gradient-to-r from-gray-900 to-gray-950 p-4 rounded-xl border border-gray-800/50">
@@ -253,7 +260,7 @@ export default function AdminDashboard() {
                                         <p className="text-xs text-gray-400">Allow only mobile/tablet devices</p>
                                     </div>
                                     <button
-                                        onClick={() => setSettings({...settings, restrict_desktop: !settings.restrict_desktop})}
+                                        onClick={() => setSettings({ ...settings, restrict_desktop: !settings.restrict_desktop })}
                                         className={`relative w-14 h-7 rounded-full transition-colors ${settings.restrict_desktop ? 'bg-emerald-600' : 'bg-gray-700'}`}
                                     >
                                         <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transform transition-transform ${settings.restrict_desktop ? 'translate-x-8' : 'translate-x-1'}`} />
@@ -268,11 +275,11 @@ export default function AdminDashboard() {
                             <div className="space-y-2">
                                 <label className="block text-gray-300 font-medium">Force Crash Point</label>
                                 <div className="relative">
-                                    <input 
-                                        type="number" 
+                                    <input
+                                        type="number"
                                         step="0.01"
                                         value={settings.force_crash_point}
-                                        onChange={(e) => setSettings({...settings, force_crash_point: parseFloat(e.target.value)})}
+                                        onChange={(e) => setSettings({ ...settings, force_crash_point: parseFloat(e.target.value) })}
                                         className="w-full p-3 pl-10 bg-gradient-to-r from-gray-900 to-gray-950 text-yellow-400 font-bold rounded-xl border border-gray-700/50 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 outline-none"
                                     />
                                     <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-yellow-500">x</div>
@@ -283,26 +290,26 @@ export default function AdminDashboard() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="block text-gray-300 font-medium">House Edge (%)</label>
-                                    <input 
+                                    <input
                                         type="number"
                                         value={settings.house_edge}
-                                        onChange={(e) => setSettings({...settings, house_edge: parseFloat(e.target.value)})}
+                                        onChange={(e) => setSettings({ ...settings, house_edge: parseFloat(e.target.value) })}
                                         className="w-full p-3 bg-gradient-to-r from-gray-900 to-gray-950 text-white rounded-xl border border-gray-700/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="block text-gray-300 font-medium">Max Win ($)</label>
-                                    <input 
+                                    <input
                                         type="number"
                                         value={settings.max_win_limit}
-                                        onChange={(e) => setSettings({...settings, max_win_limit: parseFloat(e.target.value)})}
+                                        onChange={(e) => setSettings({ ...settings, max_win_limit: parseFloat(e.target.value) })}
                                         className="w-full p-3 bg-gradient-to-r from-gray-900 to-gray-950 text-white rounded-xl border border-gray-700/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
                                     />
                                 </div>
                             </div>
 
                             {/* Save Button */}
-                            <button 
+                            <button
                                 onClick={handleSaveSettings}
                                 className="w-full py-4 px-6 bg-gradient-to-r from-orange-600 to-red-600 rounded-xl font-bold text-white uppercase tracking-wider hover:from-orange-500 hover:to-red-500 active:scale-95 transition-all shadow-lg shadow-orange-900/20"
                             >
@@ -315,26 +322,26 @@ export default function AdminDashboard() {
                     <div className="lg:col-span-2 bg-gradient-to-br from-gray-900/50 to-gray-950/50 backdrop-blur-sm rounded-2xl border border-gray-800/30 shadow-lg flex flex-col h-[80vh]">
                         {/* Tabs */}
                         <div className="flex border-b border-gray-800/50">
-                            <button 
+                            <button
                                 onClick={() => setActiveTab('USERS')}
                                 className={`flex-1 flex items-center justify-center gap-3 py-4 font-bold transition-all ${activeTab === 'USERS' ? 'text-blue-400 border-b-2 border-blue-400 bg-gradient-to-b from-blue-900/10 to-transparent' : 'text-gray-500 hover:text-gray-300'}`}
                             >
                                 <FiUsers />
                                 Players ({users.length})
                             </button>
-                            <button 
+                            <button
                                 onClick={() => setActiveTab('WITHDRAWALS')}
                                 className={`flex-1 flex items-center justify-center gap-3 py-4 font-bold transition-all ${activeTab === 'WITHDRAWALS' ? 'text-amber-400 border-b-2 border-amber-400 bg-gradient-to-b from-amber-900/10 to-transparent' : 'text-gray-500 hover:text-gray-300'}`}
                             >
                                 <MdAttachMoney />
-                                Withdrawals 
+                                Withdrawals
                                 {withdrawals.filter(w => w.status === 'PENDING').length > 0 && (
                                     <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">
                                         {withdrawals.filter(w => w.status === 'PENDING').length}
                                     </span>
                                 )}
                             </button>
-                            <button 
+                            <button
                                 onClick={() => setActiveTab('PROFIT_HISTORY')}
                                 className={`flex-1 flex items-center justify-center gap-3 py-4 font-bold transition-all ${activeTab === 'PROFIT_HISTORY' ? 'text-purple-400 border-b-2 border-purple-400 bg-gradient-to-b from-purple-900/10 to-transparent' : 'text-gray-500 hover:text-gray-300'}`}
                             >
@@ -349,7 +356,7 @@ export default function AdminDashboard() {
                                     {/* Search */}
                                     <div className="relative mb-6">
                                         <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" />
-                                        <input 
+                                        <input
                                             type="text"
                                             placeholder="Search players..."
                                             value={searchQuery}
@@ -378,21 +385,21 @@ export default function AdminDashboard() {
                                                     <div className="text-right">
                                                         <div className="text-2xl font-black font-mono text-emerald-400 mb-4">${u.balance.toFixed(2)}</div>
                                                         <div className="flex flex-col gap-2">
-                                                            <input 
+                                                            <input
                                                                 type="number"
                                                                 placeholder="Amount"
                                                                 className="w-32 px-3 py-2 bg-gradient-to-r from-gray-900 to-gray-950 text-white rounded-lg border border-gray-700/50 text-sm"
                                                                 value={topUpAmount[u.id] || ''}
-                                                                onChange={(e) => setTopUpAmount({...topUpAmount, [u.id]: e.target.value})}
+                                                                onChange={(e) => setTopUpAmount({ ...topUpAmount, [u.id]: e.target.value })}
                                                             />
                                                             <div className="flex gap-2">
-                                                                <button 
+                                                                <button
                                                                     onClick={() => handleTransaction(u.id, u.username, 'ADD')}
                                                                     className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-emerald-700 px-3 py-2 rounded-lg text-xs font-bold hover:from-emerald-500 hover:to-emerald-600"
                                                                 >
                                                                     <FiPlus className="text-xs" /> Add
                                                                 </button>
-                                                                <button 
+                                                                <button
                                                                     onClick={() => handleTransaction(u.id, u.username, 'DEDUCT')}
                                                                     className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 px-3 py-2 rounded-lg text-xs font-bold hover:from-red-500 hover:to-red-600"
                                                                 >
@@ -443,13 +450,13 @@ export default function AdminDashboard() {
                                                 </span>
                                                 {w.status === 'PENDING' && (
                                                     <div className="flex gap-2">
-                                                        <button 
+                                                        <button
                                                             onClick={() => handleWithdrawalAction(w.id, 'APPROVE')}
                                                             className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-2 rounded-lg text-sm font-bold hover:from-emerald-500 hover:to-emerald-600"
                                                         >
                                                             <FiCheck /> Approve
                                                         </button>
-                                                        <button 
+                                                        <button
                                                             onClick={() => handleWithdrawalAction(w.id, 'REJECT')}
                                                             className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 px-4 py-2 rounded-lg text-sm font-bold hover:from-red-500 hover:to-red-600"
                                                         >

@@ -5,8 +5,15 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.decorators import api_view, permission_classes
 from django.contrib.auth.models import User
-from .serializers import RegisterSerializer, UserSerializer, WithdrawalRequestSerializer
-from .models import Profile, GameSettings, WithdrawalRequest, GameRound,ProfitSettlement
+from .serializers import PasswordResetConfirmSerializer, RegisterSerializer, UserSerializer, WithdrawalRequestSerializer
+from .models import Bet, GameHistory, Profile, GameSettings, WithdrawalRequest, GameRound,ProfitSettlement
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from .serializers import PasswordResetRequestSerializer, PasswordResetConfirmSerializer
+from .serializers import GameHistorySerializer
+from .models import GameHistory, SiteVisit
+from .serializers import GameHistorySerializer, SiteVisitSerializer
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -174,3 +181,180 @@ def admin_withdrawals(request):
                 profile.save()
                 return Response({"message": "Rejected"})
         except: return Response({"error": "Error"}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def request_password_reset(request):
+    serializer = PasswordResetRequestSerializer(data=request.data)
+    if serializer.is_valid():
+        email = serializer.validated_data['email']
+        try:
+            user = User.objects.get(email=email)
+            
+            # Token එකක් හදනවා
+            token = default_token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            
+            # Reset Link එක (ඔබේ Frontend Domain එක දාන්න)
+            reset_link = f"https://127.0.0.1:8000/reset-password?uid={uid}&token={token}"
+            
+            # ඇත්තටම ඊමේල් යවන්න කලින්, අපි Console එකේ ප්‍රින්ට් කරමු (Testing වලට)
+            print(f"========== PASSWORD RESET LINK ==========")
+            print(f"User: {user.username}")
+            print(f"Link: {reset_link}")
+            print(f"=========================================")
+            
+            # මෙතනට පස්සේ Email යවන කෝඩ් එක දාන්න පුළුවන් (send_mail function එකෙන්)
+
+            return Response({"message": "Password reset link sent to your email (Check Server Console for now)"})
+        except User.DoesNotExist:
+            # ආරක්ෂාවට අපි කියනවා email එක යැව්වා කියලා, නැත්නම් හැකර්ලාට ඊමේල් හොයන්න පුළුවන්
+            return Response({"message": "Password reset link sent to your email"})
+    
+    return Response(serializer.errors, status=400)
+
+# 2. අලුත් පාස්වර්ඩ් එක දාන API එක
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def confirm_password_reset(request):
+    serializer = PasswordResetConfirmSerializer(data=request.data)
+    if serializer.is_valid():
+        uid = serializer.validated_data['uidb64']
+        token = serializer.validated_data['token']
+        password = serializer.validated_data['new_password']
+        
+        try:
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(pk=user_id)
+            
+            if default_token_generator.check_token(user, token):
+                user.set_password(password)
+                user.save()
+                return Response({"message": "Password reset successful! You can login now."})
+            else:
+                return Response({"error": "Invalid or expired token"}, status=400)
+        except Exception as e:
+            return Response({"error": "Invalid token"}, status=400)
+            
+    return Response(serializer.errors, status=400)
+
+
+# --- ANALYTICS & STATS ---
+
+@api_view(['GET', 'DELETE'])
+@permission_classes([IsAdminUser])
+def admin_analytics(request):
+    if request.method == 'GET':
+        history = GameHistory.objects.all().order_by('-created_at')[:50]
+        serializer = GameHistorySerializer(history, many=True)
+        return Response(serializer.data)
+    if request.method == 'DELETE':
+        action = request.data.get('action')
+        if action == 'CLEAR_ALL':
+            GameHistory.objects.all().delete()
+            return Response({"message": "Cleared"})
+        rec_id = request.data.get('id')
+        if rec_id:
+            GameHistory.objects.filter(id=rec_id).delete()
+            return Response({"message": "Deleted"})
+        return Response({"error": "Invalid"}, status=400)
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_profit_stats(request):
+    # 1. Current Active Profit (තාම Clear කරලා නැති ලාභය)
+    current_profit = GameRound.objects.filter(settlement__isnull=True).aggregate(Sum('house_profit'))['house_profit__sum'] or 0.00
+    
+    # 2. Total All Time Profit
+    total_profit = GameRound.objects.aggregate(Sum('house_profit'))['house_profit__sum'] or 0.00
+    
+    # 3. Current Bets
+    current_bets = GameRound.objects.filter(settlement__isnull=True).aggregate(Sum('total_bets'))['total_bets__sum'] or 0.00
+
+    # 4. History (Settlements)
+    history = ProfitSettlement.objects.all().order_by('-created_at').values('id', 'amount', 'created_at')
+
+    return Response({
+        "current_profit": float(current_profit), # Frontend එක බලාපොරොත්තු වන අගය
+        "total_profit": float(total_profit),
+        "current_bets": float(current_bets),
+        "history": list(history)
+    })
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def admin_clear_profit(request):
+    # Settlement එකක් හදලා දැනට තියෙන Active Rounds ටික ඒකට දානවා
+    unsettled_rounds = GameRound.objects.filter(settlement__isnull=True)
+    current_profit = unsettled_rounds.aggregate(Sum('house_profit'))['house_profit__sum'] or 0.00
+
+    if current_profit == 0:
+        return Response({"error": "No profit to clear"}, status=400)
+
+    settlement = ProfitSettlement.objects.create(amount=current_profit)
+    unsettled_rounds.update(settlement=settlement)
+
+    return Response({
+        "message": "Profit Cleared!",
+        "cleared_amount": float(current_profit)
+    })
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def record_visit(request): 
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    ip = x_forwarded_for.split(',')[0] if x_forwarded_for else request.META.get('REMOTE_ADDR')
+    user_agent = request.META.get('HTTP_USER_AGENT', '')
+    path = request.data.get('path', '/')
+    SiteVisit.objects.create(ip_address=ip, user_agent=user_agent, path=path)
+    return Response({"message": "Recorded"})
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_visitor_stats(request):
+    total_visits = SiteVisit.objects.count()
+    unique_visitors = SiteVisit.objects.values('ip_address').distinct().count()
+    recent_visits = SiteVisit.objects.all().order_by('-timestamp')[:100]
+    serializer = SiteVisitSerializer(recent_visits, many=True)
+    return Response({
+        "total_visits": total_visits,
+        "unique_visitors": unique_visitors,
+        "recent_visits": serializer.data
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_player_search(request):
+    username = request.query_params.get('username')
+    if not username:
+        return Response({"error": "Username required"}, status=400)
+    
+    try:
+        user = User.objects.get(username__iexact=username)
+        profile = Profile.objects.get(user=user)
+        
+        total_bets = Bet.objects.filter(user=user).count()
+        total_wagered = Bet.objects.filter(user=user).aggregate(Sum('amount'))['amount__sum'] or 0.00
+        total_profit = Bet.objects.filter(user=user, cashed_out=True).aggregate(Sum('profit'))['profit__sum'] or 0.00
+        total_lost = Bet.objects.filter(user=user, cashed_out=False).aggregate(Sum('amount'))['amount__sum'] or 0.00
+        net_profit = float(total_profit) - float(total_lost)
+
+        last_bets = Bet.objects.filter(user=user).order_by('-created_at')[:20].values(
+            'amount', 'cashed_out', 'cashed_out_at', 'profit', 'created_at'
+        )
+
+        return Response({
+            "found": True,
+            "username": user.username,
+            "balance": profile.balance,
+            "stats": {
+                "total_rounds": total_bets,
+                "total_wagered": total_wagered,
+                "net_profit": net_profit
+            },
+            "history": list(last_bets)
+        })
+
+    except User.DoesNotExist:
+        return Response({"found": False, "message": "User not found"})

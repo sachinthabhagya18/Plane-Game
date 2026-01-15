@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Profile, WithdrawalRequest
+from .models import GameHistory, Profile, SiteVisit, WithdrawalRequest
 
 class UserSerializer(serializers.ModelSerializer):
     balance = serializers.SerializerMethodField()
@@ -83,3 +83,24 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = WithdrawalRequest
         fields = ['id', 'user', 'username', 'amount', 'status', 'request_date', 'bank_snapshot']
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    uidb64 = serializers.CharField()
+    new_password = serializers.CharField(min_length=8)
+
+
+class GameHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GameHistory
+        fields = '__all__'
+
+# --- Site Visit Serializer ---
+class SiteVisitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SiteVisit
+        fields = '__all__'

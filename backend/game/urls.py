@@ -1,10 +1,10 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .views import (
-    RegisterView, CurrentUserView, UserDetailView,
-    admin_settings, admin_users_list, admin_add_balance,
+    RegisterView, CurrentUserView, UserDetailView, admin_analytics, admin_player_search,
+    admin_settings, admin_users_list, admin_add_balance, admin_visitor_stats, confirm_password_reset,
     public_settings, player_withdrawal, admin_withdrawals,
-    admin_profit_stats # NEW IMPORT
+    admin_profit_stats, admin_clear_profit, record_visit, request_password_reset
 )
 
 urlpatterns = [
@@ -23,4 +23,11 @@ urlpatterns = [
     path('api/admin/withdrawals/', admin_withdrawals, name='admin_withdrawals'),
     path('api/admin/profit/', admin_profit_stats, name='admin_profit_stats'), # NEW URL
     path('api/admin/profit/clear/', admin_clear_profit, name='admin_clear_profit'), # NEW URL
+    path('api/password-reset/', request_password_reset, name='request_password_reset'),
+    path('api/password-reset-confirm/', confirm_password_reset, name='confirm_password_reset'),
+    path('api/admin/analytics/', admin_analytics, name='admin_analytics'),
+    path('api/record-visit/', record_visit, name='record_visit'),
+    path('api/admin/visitors/', admin_visitor_stats, name='admin_visitor_stats'),
+    path('api/admin/player-search/', admin_player_search, name='admin_player_search'),
+
 ]
